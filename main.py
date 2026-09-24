@@ -1,41 +1,31 @@
 from fastapi import FastAPI
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.staticfiles import StaticFiles
+from routes.scraper import router as scraper_router
+from routes.translate_image import router as translator_image
 app = FastAPI()
 # url = "https://rawkuma.net/manga/deaimon/"
 # url = "https://en.wikipedia.org/wiki/Nicol%C3%A1s_Maduro"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173","http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 headers = {
     "User-Agent": "MyLearningScraper/1.0"
 }
-@app.post("/scraper")
-def scrape_page(data: dict):
+
+app.mount(
+    "/output",
+    StaticFiles(directory="output"),
+    name="output"
+)
+app.include_router(scraper_router)
+app.include_router(translator_image)
+
+
     
-    url = data["url"]
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    texts = []
-
-    for p in soup.find_all("p"):
-        texts.append(p.get_text(strip=True))
-    images = []
-
-    for img in soup.find_all("img"):
-        src = img.get("src")
-        if src:
-            images.append(urljoin(url, src))
-
-    return {
-        "title": soup.title.get_text(strip=True) if soup.title else "",
-        "text": texts,
-        "images": images
-    }
+   
