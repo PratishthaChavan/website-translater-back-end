@@ -1,6 +1,7 @@
-from fastapi import APIRouter,BackgroundTasks
+from fastapi import APIRouter,BackgroundTasks,Request
 from services.scraper_service import scrape_page
 from fastapi.responses import StreamingResponse
+from services.rate_limiter import allow_request
 
 from services.job_service import create_job,jobs
 from services.chapter_service import translate_chapter
@@ -15,9 +16,15 @@ router = APIRouter()
 #     return scrape_page(url)
 
 @router.post("/scraper")
-def translate(data: dict,background_tasks: BackgroundTasks):
+def translate(data: dict,background_tasks: BackgroundTasks,request: Request):
     job_id = create_job()
-
+    client_ip = request.client.host
+    allowed = allow_request(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please try again later."
+        )
     url = data["url"]
     target_language = data["target_language"]
     background_tasks.add_task(translate_chapter,url,job_id,target_language)

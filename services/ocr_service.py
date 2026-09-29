@@ -1,5 +1,6 @@
 import sys
 import cv2
+
 from manga_ocr import MangaOcr
 from PIL import Image
 
@@ -21,7 +22,11 @@ def detect_text(image):
     print("Detecting text in image...")
 
     mask, mask_refined, blocks = detector(image)
-    print("The text block===>",blocks)
+
+    print(
+        f"CTD detected {len(blocks)} blocks"
+    )
+
     return {
         "mask": mask,
         "mask_refined": mask_refined,
@@ -37,7 +42,9 @@ def extract_text(image, blocks):
 
     for i, block in enumerate(blocks):
 
-        print(f"\n========== BLOCK {i + 1} ==========")
+        print(
+            f"\n========== BLOCK {i + 1} =========="
+        )
 
         x1, y1, x2, y2 = map(
             int,
@@ -49,10 +56,29 @@ def extract_text(image, blocks):
             (x1, y1, x2, y2)
         )
 
-        x1 = max(0, min(x1, width - 1))
-        y1 = max(0, min(y1, height - 1))
-        x2 = max(0, min(x2, width))
-        y2 = max(0, min(y2, height))
+        # ------------------------------------------
+        # Clamp coordinates
+        # ------------------------------------------
+
+        x1 = max(
+            0,
+            min(x1, width - 1)
+        )
+
+        y1 = max(
+            0,
+            min(y1, height - 1)
+        )
+
+        x2 = max(
+            0,
+            min(x2, width)
+        )
+
+        y2 = max(
+            0,
+            min(y2, height)
+        )
 
         print(
             "Clamped box:",
@@ -60,8 +86,14 @@ def extract_text(image, blocks):
         )
 
         if x2 <= x1 or y2 <= y1:
+
             print("INVALID BOX")
+
             continue
+
+        # ------------------------------------------
+        # Crop text region
+        # ------------------------------------------
 
         crop = image[
             y1:y2,
@@ -74,8 +106,14 @@ def extract_text(image, blocks):
         )
 
         if crop.size == 0:
+
             print("EMPTY CROP")
+
             continue
+
+        # ------------------------------------------
+        # Convert BGR → RGB
+        # ------------------------------------------
 
         crop_rgb = cv2.cvtColor(
             crop,
@@ -85,6 +123,10 @@ def extract_text(image, blocks):
         crop_pil = Image.fromarray(
             crop_rgb
         )
+
+        # ------------------------------------------
+        # MangaOCR
+        # ------------------------------------------
 
         source_text = ocr(
             crop_pil
@@ -96,14 +138,25 @@ def extract_text(image, blocks):
         )
 
         if not source_text:
+
             print(
                 "OCR RETURNED EMPTY → BLOCK DROPPED"
             )
+
             continue
+
+        # ------------------------------------------
+        # Save result
+        # ------------------------------------------
 
         results.append({
             "text": source_text,
-            "box": [x1, y1, x2, y2]
+            "box": [
+                x1,
+                y1,
+                x2,
+                y2
+            ]
         })
 
     return results

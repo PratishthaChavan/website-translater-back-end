@@ -2,13 +2,15 @@ import torch
 import time
 import requests
 
-LLAMA_URL = "http://localhost:8080/v1/chat/completions"
-
+OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+MODEL_NAME = "gemma3:12b"
 def translate_with_llama(prompt):
 
     response = requests.post(
-        LLAMA_URL,
+        OLLAMA_URL,
+        
         json={
+            "model": MODEL_NAME,
             "messages": [
                 {
                     "role": "user",
@@ -51,10 +53,14 @@ def text_translator(texts, trg):
     )
 
     page_context = "\n".join(
-        f"{i + 1}. {item['text']}"
+    (
+            f"{i + 1}. {item['text']} "
+            f"(reading: {item['reading']})"
+            if item.get("is_name")
+            else f"{i + 1}. {item['text']}"
+        )
         for i, item in enumerate(texts)
     )
-
     prompt = (
         "You are a professional Japanese manga translator.\n\n"
 
