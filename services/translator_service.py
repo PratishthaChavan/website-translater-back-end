@@ -4,6 +4,17 @@ import requests
 
 OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
 MODEL_NAME = "gemma3:12b"
+KNOWN_NAMES = """
+KNOWN CHARACTER NAMES / READINGS:
+- 和さん → Nagumo-san
+- いつか → Itsuka
+
+IMPORTANT:
+- These are confirmed character names.
+- When these Japanese names appear, use the confirmed English name.
+- Do NOT reinterpret the kanji using its dictionary reading.
+- Do NOT change Nagumo to Nagomi.
+"""
 def translate_with_llama(prompt):
 
     response = requests.post(
@@ -62,34 +73,37 @@ def text_translator(texts, trg):
         for i, item in enumerate(texts)
     )
     prompt = (
-        "You are a professional Japanese manga translator.\n\n"
+    "You are a professional Japanese manga translator.\n\n"
 
-        f"Translate all dialogue into natural {target_language}.\n\n"
+    f"Translate all dialogue into natural {target_language}.\n\n"
 
-        "Use the entire page dialogue as context to understand "
-        "omitted subjects, relationships, pronouns, tone, emotion, "
-        "dialect, and proper names.\n\n"
+    "Use the entire page dialogue as context to understand "
+    "omitted subjects, relationships, pronouns, tone, emotion, "
+    "dialect, and proper names.\n\n"
 
-        "Rules:\n"
-        "- Preserve character names.\n"
-        "- Never translate a character name by its dictionary meaning.\n"
-        "- Never invent or replace names.\n"
-        "- Keep character names consistent.\n"
-        "- Do not summarize.\n"
-        "- Do not omit information.\n"
-        "- Preserve emotion and speaker intent.\n"
-        "- Preserve dialect naturally.\n"
-        "- Return exactly one translation for each numbered dialogue.\n"
-        "- Keep the original numbering.\n"
-        "- Return only the translations.\n\n"
+    + KNOWN_NAMES + "\n\n"
 
-        f"Translate exactly {len(texts)} dialogue items.\n\n"
+    "Rules:\n"
+    "- Preserve character names.\n"
+    "- Use confirmed character name readings when provided above.\n"
+    "- Never translate a character name by its dictionary meaning.\n"
+    "- Never invent or replace names.\n"
+    "- Keep character names consistent.\n"
+    "- Do not summarize.\n"
+    "- Do not omit information.\n"
+    "- Preserve emotion and speaker intent.\n"
+    "- Preserve dialect naturally.\n"
+    "- Return exactly one translation for each numbered dialogue.\n"
+    "- Keep the original numbering.\n"
+    "- Return only the translations.\n\n"
 
-        "PAGE DIALOGUE:\n"
-        f"{page_context}\n\n"
+    f"Translate exactly {len(texts)} dialogue items.\n\n"
 
-        "TRANSLATIONS:"
-    )
+    "PAGE DIALOGUE:\n"
+    f"{page_context}\n\n"
+
+    "TRANSLATIONS:"
+)
 
     output_text = translate_with_llama(
         prompt

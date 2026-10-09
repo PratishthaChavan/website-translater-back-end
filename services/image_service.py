@@ -5,7 +5,6 @@ from PIL import Image, ImageDraw, ImageFont
 from services.font_service import get_font_path
 font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-
 def remove_text(image, mask_refined):
     return cv2.inpaint(
         image,
@@ -224,12 +223,10 @@ def save_translated_page(translated_image,manga_name,chapter_name,page_number):
     )
 
     filename = f"page_{page_number:03d}.png"
-
     output_path = os.path.join(
         output_dir,
         filename
     )
-
     success = cv2.imwrite(
         output_path,
         translated_image

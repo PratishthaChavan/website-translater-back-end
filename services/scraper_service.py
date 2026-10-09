@@ -100,8 +100,6 @@ def get_chapter_info(soup, url=None):
     )
 
     chapter_number = chapter_match.group(1) if chapter_match else None
-
-    # fallback: pull chapter number from the URL path, e.g. /chapter-29/
     if chapter_number is None and url:
         url_match = re.search(
             r"chapter[\s\-_/]*(\d+(?:\.\d+)?)",

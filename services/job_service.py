@@ -14,7 +14,7 @@ def add_page(job_id,page_number,page_url):
     jobs[job_id]["pages"].append({
         "page" : page_number,"url":page_url
     })
-    print("Page added to job:", page_number, page_url)
+
 def complete_job(job_id):
     jobs[job_id]["status"] = "Complete"
     jobs[job_id]["complete"] = True

@@ -62,51 +62,18 @@ def image_to_bytes(image):
 
 def build_name_prompt(text):
     return f"""
-You are reading a Japanese manga character name.
+This is a crop of a Japanese manga speech bubble containing: {text}
 
-A text detector found a possible name region in the image.
-MangaOCR detected:
-
-{text}
-
-The image you are seeing is the detected name region.
-
-Your job is to inspect the IMAGE itself.
-
-The region may contain:
-- large kanji characters
-- small furigana beside or above the kanji
-- an honorific such as さん
-
-IMPORTANT:
-
-- Read the small furigana directly from the image.
-- The furigana visible in the image is the source of the name reading.
-- Do NOT infer the reading from the kanji.
-- Do NOT use dictionary knowledge to determine the reading.
-- Do NOT guess the reading.
-- Do NOT replace the visible furigana with a common Japanese name reading.
-- Do NOT use the MangaOCR result as the name reading.
-- MangaOCR is only provided as a hint about which region contains a possible name.
-- Inspect the actual small characters in the image.
-- さん, ちゃん, くん, 君, 様, さま, and 先生 are honorifics.
-- Do not include an honorific as part of the person's name.
-
-First identify the large kanji characters that form the name.
-
-Then identify the small furigana characters visually.
-
-Then return the furigana exactly as it appears in the image.
+Above or beside the kanji there are small kana (furigana) showing its reading.
+Read ALL of the furigana characters, in order. It is usually 2-4 kana long.
+Do not stop after the first character.
+Do not guess the reading from the kanji. If there is no furigana, answer NONE.
+Ignore the honorific (さん, ちゃん, くん, 君, 様, さま, 先生).
 
 Return ONLY:
-
-KANJI: <large kanji name>
-FURIGANA: <small furigana read from image>
-READING: <same furigana reading>
-
-Do not add explanations.
-Do not translate.
-Do not romanize.
+KANJI: <kanji of the name>
+FURIGANA: <all furigana kana, or NONE>
+READING: <same as FURIGANA, or NONE>
 """
 
 
@@ -169,133 +136,67 @@ def parse_name_result(result):
         "reading": reading
     }
 
+def is_valid_reading(reading):
+    # pure hiragana, at least 2 characters (e.g. なごむ)
+    return bool(re.fullmatch(r"[\u3041-\u3096ー]{2,}", reading))
 
-def resolve_name_with_gemma(
-    image,
-    text,
-    box=None
-):
-    print(
-        f"\n[NameResolver] MangaOCR: {text}"
-    )
+def resolve_name_with_gemma(image, text, box=None):
+    print(f"\n[NameResolver] MangaOCR: {text}")
 
     if box is None:
         print("[NameResolver] No box provided.")
         return None
 
     x1, y1, x2, y2 = map(int, box)
-
     height, width = image.shape[:2]
+    bw, bh = x2 - x1, y2 - y1
 
-    x1 = max(0, min(x1, width - 1))
-    y1 = max(0, min(y1, height - 1))
-    x2 = max(0, min(x2, width))
-    y2 = max(0, min(y2, height))
+    # Furigana sits above/right of the kanji, so pad those sides the most
+    x1 = max(0, x1 - int(bw * 0.3))
+    x2 = min(width, x2 + int(bw * 0.8))
+    y1 = max(0, y1 - int(bh * 0.2))
+    y2 = min(height, y2 + int(bh * 0.1))
 
-    crop = image[
-        y1:y2,
-        x1:x2
-    ]
+    crop = image[y1:y2, x1:x2]
 
     if crop.size == 0:
         print("[NameResolver] EMPTY CROP")
         return None
 
-    print(
-        "[NameResolver] Crop shape:",
-        crop.shape
-    )
-    crop = cv2.resize(
-        crop,
-        None,
-        fx=4,
-        fy=4,
-        interpolation=cv2.INTER_CUBIC
-    )
+    cv2.imwrite("debug_name_crop_original.png", crop)
 
-    print(
-        "[NameResolver] Upscaled crop:",
-        crop.shape
-    )
+    # 3x is enough; 8x just adds blur and a huge image
+    crop = cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    cv2.imwrite("debug_name_crop_image.png", crop)
 
-    cv2.imwrite(
-        "debug_name_crop.png",
-        crop
-    )
-
-    print(
-        "[NameResolver] Saved debug_name_crop.png"
-    )
-
-    # ------------------------------------------
-    # Convert crop to bytes
-    # ------------------------------------------
-
-    image_bytes = image_to_bytes(
-        crop
-    )
+    image_bytes = image_to_bytes(crop)
 
     if image_bytes is None:
-        print(
-            "[NameResolver] Could not encode crop."
-        )
+        print("[NameResolver] Could not encode crop.")
         return None
+
     prompt = build_name_prompt(text)
 
-    print(
-        "[NameResolver] Sending CROP to Gemma..."
-    )
-
     try:
-
-        result = analyze_image(
-            image_bytes,
-            prompt
-        )
-
+        result = analyze_image(image_bytes, prompt)
     except Exception as e:
-
-        print(
-            f"[NameResolver] Gemma failed: {e}"
-        )
-
+        print(f"[NameResolver] Gemma failed: {e}")
         return None
-
-    print(
-        "\n========== GEMMA NAME =========="
-    )
-
-    print(result)
-
-    print(
-        "================================\n"
-    )
 
     parsed = parse_name_result(result)
 
     if parsed is None:
-
-        print(
-            "[NameResolver] Could not parse Gemma result."
-        )
-
+        print("[NameResolver] Could not parse Gemma result.")
         return None
 
-    print(
-        "[NameResolver] Resolved:"
-    )
+    if not is_valid_reading(parsed["reading"]):
+        print(f"[NameResolver] Rejected reading: {parsed['reading']!r}")
+        return None
 
-    print(
-        f"KANJI: {parsed['kanji']}"
-    )
-
-    print(
-        f"FURIGANA: {parsed['furigana']}"
-    )
-
-    print(
-        f"READING: {parsed['reading']}"
-    )
+    print("[NameResolver] Resolved:")
+    print(f"KANJI: {parsed['kanji']}")
+    print(f"FURIGANA: {parsed['furigana']}")
+    print(f"READING: {parsed['reading']}")
 
     return parsed
 def resolve_name(
@@ -327,11 +228,7 @@ def resolve_name(
     print(
         f"[NameResolver] Possible name: {text}"
     )
-    print(resolve_name_with_gemma(
-        image,  
-        text,
-        box
-    ))
+    
     return resolve_name_with_gemma(
         image,  
         text,

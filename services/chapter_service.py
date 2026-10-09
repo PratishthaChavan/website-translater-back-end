@@ -3,7 +3,11 @@ import numpy as np
 import cv2
 import os
 import re
-
+from services.s3_service import (
+    upload_image,
+    get_saved_pages,
+    get_presigned_url
+)
 from services.image_service import save_translated_page
 from services.job_service import complete_job, add_page
 from services.image_translation_service import translate_image
@@ -84,61 +88,132 @@ def download_image(image_url):
         return None
 
 
-def translate_chapter(
-    url,
-    job_id,
-    target_language
-):
+# def translate_chapter(
+#     url,
+#     job_id,
+#     target_language
+# ):
 
+#     page_data = scrape_page(url)
+#     manga_name = page_data["manga_name"]
+#     chapter_name = (
+#         f"chapter_{page_data['chapter_number']}"
+#     )
+
+#     image_urls = page_data["images"]
+
+#     saved_pages = get_saved_pages(
+#         manga_name,
+#         chapter_name
+#     )
+
+#     for page_number, image_url in enumerate(
+#         image_urls,
+#         start=1
+#     ):
+
+#         if page_number in saved_pages:
+#             page_url = get_presigned_url(
+#                 saved_pages[page_number]
+#             )
+
+#             add_page(
+#                 job_id,
+#                 page_number,
+#                 page_url
+#             )
+
+#             continue
+#         image = download_image(
+#             image_url
+#         )
+#         if image is None:
+#             continue
+
+#         if not is_manga_page(image):
+#             print(
+#                 f"Skipping non-page image: "
+#                 f"{image_url}"
+#             )
+#             continue
+
+#         translated_image = translate_image(
+#             image,
+#             target_language
+#         )
+
+#         # output_path = save_translated_page(
+#         #     translated_image,
+#         #     manga_name,
+#         #     chapter_name,
+#         #     page_number
+#         # )
+
+#         # page_url = "/" + output_path.replace(
+#         #     "\\",
+#         #     "/"
+#         # )
+#         object_key = (
+#             f"manga/"
+#             f"{manga_name}/"
+#             f"{chapter_name}/"
+#             f"page_{page_number:03d}.png"
+#         )
+
+#         page_key = upload_image(
+#             translated_image,
+#             object_key
+#         )
+#         page_url = get_presigned_url(
+#             saved_pages[page_number]
+#         )
+
+#         add_page(
+#             job_id,
+#             page_number,
+#             page_url
+#         )
+#         # add_page(
+#         #     job_id,
+#         #     page_number,
+#         #     page_url
+#         # ) 
+#     complete_job(job_id)
+def translate_chapter(url,job_id,target_language):
     page_data = scrape_page(url)
-
     manga_name = page_data["manga_name"]
-
     chapter_name = (
         f"chapter_{page_data['chapter_number']}"
     )
-
-    if chapter_exists(
+    image_urls = page_data["images"]
+    saved_pages = get_saved_pages(
         manga_name,
         chapter_name
+    )
+
+    for page_number, image_url in enumerate(
+        image_urls,
+        start=1
     ):
-
-        print(
-            f"Chapter already exists: "
-            f"{manga_name}/{chapter_name}"
-        )
-
-        saved_pages = get_saved_pages(
-            manga_name,
-            chapter_name
-        )
-
-        for index, page_url in enumerate(
-            saved_pages,
-            start=1
-        ):
-
+        if page_number in saved_pages:
+            page_url = get_presigned_url(
+                saved_pages[page_number]
+            )
             add_page(
                 job_id,
-                index,
+                page_number,
                 page_url
             )
 
-        complete_job(job_id)
-        return
-    image_urls = page_data["images"]
-    page_number = 1
-    for image_url in image_urls:
+            continue
         image = download_image(
             image_url
         )
+
         if image is None:
             continue
+
         if not is_manga_page(image):
-            print(
-                f"Skipping non-page image: "
-                f"{image_url}"
-            )
             continue
 
         translated_image = translate_image(
@@ -146,16 +221,19 @@ def translate_chapter(
             target_language
         )
 
-        output_path = save_translated_page(
-            translated_image,
-            manga_name,
-            chapter_name,
-            page_number
+        object_key = (
+            f"manga/"
+            f"{manga_name}/"
+            f"{chapter_name}/"
+            f"page_{page_number:03d}.png"
         )
 
-        page_url = "/" + output_path.replace(
-            "\\",
-            "/"
+        page_key = upload_image(
+            translated_image,
+            object_key
+        )
+        page_url = get_presigned_url(
+            page_key
         )
 
         add_page(
@@ -164,11 +242,7 @@ def translate_chapter(
             page_url
         )
 
-        page_number += 1
-
     complete_job(job_id)
-
-
 def chapter_exists(
     manga_name,
     chapter_name
@@ -182,57 +256,64 @@ def chapter_exists(
     return len(saved_pages) > 0
 
 
-def get_saved_pages(
-    manga_name,
-    chapter_name
-):
+# def get_saved_pages(
+#     manga_name,
+#     chapter_name
+# ):
+#     chapter_path = os.path.join(
+#         "output",
+#         manga_name,
+#         chapter_name
+#     )
 
-    chapter_path = os.path.join(
-        "output",
-        manga_name,
-        chapter_name
-    )
+#     if not os.path.isdir(chapter_path):
+#         return {}
 
-    if not os.path.isdir(
-        chapter_path
-    ):
+#     files = [
+#         file
+#         for file in os.listdir(chapter_path)
+#         if re.match(
+#             r"^page_\d{3}\.png$",
+#             file
+#         )
+#     ]
 
-        return []
+#     files.sort()
 
-    files = [
-        file
-        for file in os.listdir(
-            chapter_path
-        )
-        if re.match(
-            r"^page_\d{3}\.png$",
-            file
-        )
-    ]
+#     pages = {}
 
-    files.sort()
+#     for file in files:
 
-    pages = [
-        "/" + os.path.join(
-            "output",
-            manga_name,
-            chapter_name,
-            file
-        ).replace(
-            "\\",
-            "/"
-        )
-        for file in files
-    ]
+#         match = re.match(
+#             r"^page_(\d{3})\.png$",
+#             file
+#         )
 
-    print(
-        "Chapter folder:",
-        chapter_path
-    )
+#         if not match:
+#             continue
 
-    print(
-        "Saved pages:",
-        pages
-    )
+#         page_number = int(
+#             match.group(1)
+#         )
 
-    return pages
+#         pages[page_number] = "/" + os.path.join(
+#             "output",
+#             manga_name,
+#             chapter_name,
+#             file
+#         ).replace(
+#             "\\",
+#             "/"
+#         )
+
+#     print(
+#         "Chapter folder:",
+#         chapter_path
+#     )
+
+#     print(
+#         "Saved pages:",
+#         pages
+#     )
+
+#     return pages

@@ -1,69 +1,58 @@
 import time
+from services.redis_client import redis_client
+TOKEN_BUCKET_SCRIPT = """
+local key = KEYS[1]
 
+local capacity = tonumber(ARGV[1])
+local refill_rate = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
 
-class TokenBucket:
+local tokens = tonumber(redis.call("HGET", key, "tokens"))
+local last_refill = tonumber(redis.call("HGET", key, "last_refill"))
 
-    def __init__(
-        self,
-        capacity,
-        refill_rate
-    ):
-        self.capacity = capacity
-        self.tokens = capacity
-        self.refill_rate = refill_rate
-        self.last_refill = time.time()
+if tokens == nil then
+    tokens = capacity
+    last_refill = now
+end
 
-    def refill(self):
+local elapsed = now - last_refill
 
-        now = time.time()
+tokens = math.min(
+    capacity,
+    tokens + (elapsed * refill_rate)
+)
 
-        elapsed = (
-            now - self.last_refill
-        )
+local allowed = 0
 
-        new_tokens = (
-            elapsed * self.refill_rate
-        )
+if tokens >= 1 then
+    tokens = tokens - 1
+    allowed = 1
+end
 
-        self.tokens = min(
-            self.capacity,
-            self.tokens + new_tokens
-        )
+redis.call("HSET", key, "tokens", tokens)
+redis.call("HSET", key, "last_refill", now)
 
-        self.last_refill = now
+redis.call("EXPIRE", key, 3600)
 
-    def consume(self):
-
-        self.refill()
-
-        if self.tokens >= 1:
-
-            self.tokens -= 1
-
-            return True
-
-        return False
-
-
-buckets = {}
-
-
-def get_bucket(client_id):
-    
-    if client_id not in buckets:
-
-        buckets[client_id] = TokenBucket(
-            capacity=5,
-            refill_rate=1 / 12
-        )
-
-    return buckets[client_id]
-
+return {allowed, tokens}
+"""
 
 def allow_request(client_id):
-
-    bucket = get_bucket(
-        client_id
+    key = f"rate_limit:{client_id}"
+    capacity = 5
+    # 1 token every 12 seconds
+    refill_rate = 1 / 12
+    now = time.time()
+    result = redis_client.eval(
+        TOKEN_BUCKET_SCRIPT,
+        1,
+        key,
+        capacity,
+        refill_rate,
+        now
     )
 
-    return bucket.consume()
+    allowed = int(result[0])
+    remaining_tokens = float(result[1])
+
+    return allowed == 1, remaining_tokens

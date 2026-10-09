@@ -2,11 +2,8 @@ import base64
 import requests
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-
-
 def analyze_image(image_bytes, prompt, model="gemma3:12b", max_tokens=512):
     encoded = base64.b64encode(image_bytes).decode("utf-8")
-
     response = requests.post(
         OLLAMA_URL,
         json={
@@ -26,8 +23,6 @@ def analyze_image(image_bytes, prompt, model="gemma3:12b", max_tokens=512):
         },
         timeout=600,
     )
-
-    print("STATUS:", response.status_code)
     if response.status_code != 200:
         print("BODY:", response.text)
 
