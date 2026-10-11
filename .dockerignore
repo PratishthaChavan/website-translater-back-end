@@ -1,0 +1,15 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+output/
+uploads/
+images/
+*.ipynb
+comic-text-detector/data/examples/
+comic-text-detector/data/doc/
+docker-build.log
+Dockerfile.old
+ctd_block_0.png

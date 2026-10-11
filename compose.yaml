@@ -1,0 +1,47 @@
+services:
+  frontend:
+    build:
+      context: ../website-translater-front-end
+    container_name: manga-translator-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    
+
+  backend:
+    build: .
+    container_name: manga-translator-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      OLLAMA_URL: http://ollama:11434/v1/chat/completions
+      OLLAMA_VISION_URL: http://ollama:11434/api/chat
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - /home/pratik-gopal-chavan/.aws:/root/.aws:ro
+    depends_on:
+      - ollama
+      - redis
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: manga-translator-redis
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

@@ -1,6 +1,10 @@
 import base64, requests, cv2
+import os
 
-OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434/v1/chat/completions"
+)
 MODEL_NAME = "gemma3:12b"
 
 def gemma_read_crop(image, box, pad=6, scale=4):

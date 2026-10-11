@@ -1,8 +1,12 @@
 import torch
 import time
 import requests
-
-OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+import os
+# OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434/v1/chat/completions"
+)
 MODEL_NAME = "gemma3:12b"
 KNOWN_NAMES = """
 KNOWN CHARACTER NAMES / READINGS:

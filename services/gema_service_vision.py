@@ -1,7 +1,11 @@
 import base64
 import requests
-
-OLLAMA_URL = "http://localhost:11434/api/chat"
+import os 
+# OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434/v1/chat/completions"
+)
 def analyze_image(image_bytes, prompt, model="gemma3:12b", max_tokens=512):
     encoded = base64.b64encode(image_bytes).decode("utf-8")
     response = requests.post(
